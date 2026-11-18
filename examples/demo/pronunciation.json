@@ -1,0 +1,14 @@
+{
+ "about": "How words are vowelled before VoiceTut reads them. Keys are written without vowel marks.",
+ "words": {
+  "النهارده": "النَّهَارْدَه",
+  "تفاحات": "تُفَّاحَات",
+  "برافو": "بْرَافُو"
+ },
+ "phrases": {
+  "خطوة بخطوة": "خُطْوَة بْخُطْوَة"
+ },
+ "lines": {
+  "ممكن تعيد تاني؟": "مُمْكِن تْعِيد تَانِي؟"
+ }
+}

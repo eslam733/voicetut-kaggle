@@ -1,0 +1,9 @@
+# Spellings to try for clips that sound wrong (used by: vk fix fixes.yaml).
+# Each spelling is read exactly as written, so put in the vowel marks you want.
+takes: 2              # takes per spelling (each take sounds a little different)
+lines:
+  - line: 2           # line number: shared sentences first, then the speaker's own
+    speakers: [narrator, guide]
+    spellings:
+      - "بْرَافُو عَلِيك، إِجَابَة صَحّ!"
+      - "بْرَافُو عَلِيك، إِجَابَة صَحْ!"

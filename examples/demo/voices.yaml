@@ -1,0 +1,33 @@
+# A small demo project: two of VoiceTut's built-in voices, five lines each.
+# Copy this folder to start your own project, then edit the values below.
+
+project: vk-demo              # names your Kaggle dataset and notebooks: vk-demo-data, vk-demo-part1, ...
+kaggle:
+  username: your-kaggle-username   # <- change this to your Kaggle username
+
+speakers:
+  # Each speaker has an id (lowercase; used in file names) and ONE kind of voice:
+  - id: narrator
+    builtin: Karim            # one of VoiceTut's built-in voices
+  - id: guide
+    builtin: Yasmin
+  # Your own voice clip (5-15 s, clean, one person, WITH THAT PERSON'S CONSENT):
+  # - id: me
+  #   clip: clips/me.ogg      # any format ffmpeg reads; path relative to this file
+  #   transcript: "النهارده الجو حلو أوي وأنا مبسوط."   # exactly the words said in the clip
+
+sentences: sentences.json      # what each speaker says (see the README for the format)
+pronunciation: pronunciation.json   # optional: how to vowel words VoiceTut gets wrong
+
+recording:
+  parts: 1          # notebooks run side by side (Kaggle allows 2 GPU sessions at once)
+  num_step: 48      # VoiceTut quality steps; 16 is faster, 48 sounds best
+  hours: 11         # stop recording after this long and pack the results (Kaggle's limit is 12)
+
+check:
+  threshold: 0.15   # re-record a line when more than 15% of its letters are heard wrong
+  max_takes: 4      # the first recording plus up to 3 new takes; the best one is kept
+
+export:
+  bitrate: 20k      # Opus bitrate for the app files
+  format: webm      # webm or ogg

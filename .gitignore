@@ -1,0 +1,21 @@
+# Kaggle credentials: never commit them
+kaggle.json
+access_token
+access_token.txt
+.kaggle/
+.env
+
+# Generated notebooks, datasets, downloads and audio
+build/
+*.zip
+*.flac
+*.wav
+*.ogg
+*.webm
+*.mp3
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+venv/
