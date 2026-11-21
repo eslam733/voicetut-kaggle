@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6,<7",       # voices.yaml
     "requests>=2.28,<3",  # downloads from Kaggle's API
     "kaggle>=2.0,<3",     # the official Kaggle CLI (push, status, datasets); tested with 2.2.5
+    "six>=1.16,<2",       # kaggle 2.2.5 imports six without declaring it
 ]
 
 [project.scripts]
