@@ -10,6 +10,9 @@ on **Kaggle's free GPUs**, with every line checked by speech recognition.
 - **Workflow:** you describe the project in one file (`voices.yaml`). The `vk` command builds
   the Kaggle notebooks, starts them, downloads the results and turns them into small audio files
   for an app.
+- **Three ways to use it:** the `vk` command, the **VoiceTut Kaggle** desktop app (see
+  [The desktop app](#the-desktop-app)), or an AI assistant that runs `vk` for you (see
+  [Using it with an AI assistant](#using-it-with-an-ai-assistant)).
 
 It was first built to voice the characters of a children's learning app. Any project with many
 fixed sentences fits: games, lessons, audio guides, voice prompts.
@@ -23,16 +26,18 @@ fixed sentences fits: games, lessons, audio guides, voice prompts.
 1. [How it works](#how-it-works)
 2. [What you need](#what-you-need)
 3. [Install](#install)
-4. [Set up your Kaggle API token](#set-up-your-kaggle-api-token)
-5. [Try the demo (about 30 minutes)](#try-the-demo-about-30-minutes)
-6. [Your own project, step by step](#your-own-project-step-by-step)
-7. [The project file](#the-project-file-voicesyaml)
-8. [Fixing pronunciation](#fixing-pronunciation)
-9. [Adding lines later](#adding-lines-later)
-10. [Kaggle limits](#kaggle-limits)
-11. [Troubleshooting](#troubleshooting)
-12. [Licenses](#licenses)
-13. [Development](#development)
+4. [The desktop app](#the-desktop-app)
+5. [Set up your Kaggle API token](#set-up-your-kaggle-api-token)
+6. [Try the demo (about 30 minutes)](#try-the-demo-about-30-minutes)
+7. [Your own project, step by step](#your-own-project-step-by-step)
+8. [The project file](#the-project-file-voicesyaml)
+9. [Fixing pronunciation](#fixing-pronunciation)
+10. [Adding lines later](#adding-lines-later)
+11. [Kaggle limits](#kaggle-limits)
+12. [Troubleshooting](#troubleshooting)
+13. [Licenses](#licenses)
+14. [Using it with an AI assistant](#using-it-with-an-ai-assistant)
+15. [Development](#development)
 
 ## How it works
 
@@ -85,6 +90,89 @@ that it works:
 ```bash
 vk --help
 ```
+
+## The desktop app
+
+**VoiceTut Kaggle** is the same pipeline in a window, for when you'd rather not use a terminal.
+It runs the same `vk` steps on the same project files, so you can switch between the app and the
+command line at any time.
+
+![VoiceTut Kaggle icon](desktop/src-tauri/icons/128x128.png)
+
+### Install it (Linux)
+
+On Debian or Ubuntu, after cloning the repo:
+
+```bash
+cd voicetut-kaggle && desktop/install.sh
+```
+
+- If system packages are missing, the script prints one `sudo apt-get install -y …` line and
+  stops. Run that line, then run the script again.
+- It installs Rust for your user if needed, a private Python environment, the app and its menu
+  entry. The first build takes a few minutes.
+- Then open **VoiceTut Kaggle** from the application menu (search for "VoiceTut"). Right-click it
+  there to pin it to the taskbar or the desktop.
+- After `git pull`, run `desktop/install.sh` again to update the app.
+
+Windows and Mac: see [desktop/README.md](desktop/README.md). Those builds are not ready yet.
+
+### Use it
+
+The window has four tabs. Above them, the **status line** says what is happening on Kaggle, with
+one tag per notebook (for example *part1 complete*, *check running*). It asks Kaggle again every
+minute while a notebook is queued or running. The **Log** at the bottom shows the output of each
+step.
+
+1. **Setup**
+   - **Folder:** your project folder. The app opens `~/my-voices` if it exists. An empty folder
+     starts a new project.
+   - **Project name** and **Kaggle username** (the name in `kaggle.com/<name>`).
+   - **Kaggle token:** paste the token from kaggle.com → *Settings* → *API* and click **Save
+     token**, or use **From file…**. A new token replaces the old one. It is saved in `~/.kaggle`,
+     readable only by you, and never shown.
+   - **Speakers:** each one is a built-in voice, a voice clip plus the exact words said in it, or a
+     voice description. Use a real person's voice only with their consent.
+   - **Lines:** one sentence per line. Every speaker says these lines.
+   - **Save project** writes `voices.yaml` and the sentences file. Other settings in
+     `voices.yaml` (pronunciation, recording, check, export) and each speaker's own lines are kept.
+     Comments in `voices.yaml` are not.
+2. **Record**
+   - **Start recording** saves the project, uploads the dataset when Kaggle's copy is older, then
+     starts the recording notebooks and the check. This uses your Kaggle GPU hours.
+   - Closing the window stops following the run, not the run on Kaggle. **Resume** picks it up.
+   - **Start over** (click twice) records every line again, for a run that failed or one you want
+     to redo. Stop notebooks still running on kaggle.com first.
+   - **Stop** stops the step running in the app; notebooks already started keep running.
+3. **Results**
+   - **Download results** when the check is *complete* (the button turns green).
+   - **Listen** opens every line in your browser, with the flagged ones marked.
+   - **Export…** asks for a folder and writes small Opus files plus `lines.json` for your app.
+4. **Fix lines**, for a line that sounds wrong:
+   1. **Add a line to fix**, then pick the speaker and the line.
+   2. Write the sentence a few ways with the vowel marks you want, one per line. **Takes per
+      spelling** is how many times each one is recorded (2 is usually enough).
+   3. **Record fixes** (a few GPU minutes), then **Download takes** and **Listen to takes**.
+   4. Pick one take per line and click **Use the picked takes**. The clip is replaced in
+      `voices_checked.zip` (the original is kept once as `voices_checked.before-fixes.zip`), and
+      the spelling is added to your pronunciation file so later recordings say it the same way.
+      Then **Export** again.
+
+Adding lines later is only on the `vk` command for now (see
+[Adding lines later](#adding-lines-later)).
+
+### When something goes wrong
+
+| What you see | What to do |
+|---|---|
+| *No Kaggle token yet* | Setup tab: paste your token and click **Save token**. |
+| *check is RUNNING on Kaggle, not finished* after Download | Wait. The status line says when the check is complete. |
+| A notebook tag says *error* | Open it on kaggle.com for the log, then **Start over**. |
+| *both Kaggle GPU slots are busy* | Another notebook is running on your account. Wait for it, or stop it on kaggle.com. |
+| The window doesn't open from the menu | Run `~/.local/share/voicetut-kaggle/voicetut-kaggle-desktop` in a terminal and read the error. |
+
+The app keeps everything in your project folder, as `vk` does (`voices.yaml`, the sentences,
+`clips/`, `build/`). The app itself is in `~/.local/share/voicetut-kaggle`.
 
 ## Set up your Kaggle API token
 
@@ -192,8 +280,9 @@ vk watch
 
 `vk watch` starts every part. Kaggle runs two GPU notebooks at once, so the others wait, and it
 retries every 5 minutes. When all parts are COMPLETE, it starts the check. You can stop it with
-Ctrl+C at any time, and notebooks already started keep running. Options: `--parts part3 part4`
-(only those), `--no-check`. Run it in the background on a long job, for example
+Ctrl+C at any time, and notebooks already started keep running; `vk watch --resume` then follows
+the same run without pushing anything twice (it reads `build/kaggle/watch-state.json`, which
+`vk record` resets). Options: `--parts part3 part4` (only those), `--no-check`. Run it in the background on a long job, for example
 `nohup vk watch > watch.log 2>&1 &`.
 
 To start a single notebook yourself:
@@ -217,6 +306,14 @@ vk push check
 It listens to every line and re-records those whose letter error is above `check.threshold`, up
 to `check.max_takes` takes, keeping the best. Output: `voices_checked.zip`, with `report.json`
 inside (for each line: the text, what was heard, the error and the take kept).
+
+To see where every notebook stands, at any time:
+
+```bash
+vk status
+```
+
+It prints one line such as `part1=COMPLETE  check=RUNNING` (`NONE` means never started).
 
 ### 4. Fetch the output
 
@@ -466,6 +563,42 @@ question this project can't answer for you. Both OmniVoice and VoiceTut-TTS forb
 without consent, impersonation and fraud. This summary isn't legal advice. Licenses were checked
 in November 2026.
 
+## Using it with an AI assistant
+
+AI coding assistants (Claude Code, Cursor, Codex and others) can run the whole pipeline for you
+through the `vk` command. The repo has [AGENTS.md](AGENTS.md) for them: the commands, which ones
+use Kaggle GPU time, and the rules they must follow. Cursor and Codex read `AGENTS.md` on their
+own; `CLAUDE.md` points Claude Code to it.
+
+Open this repo (or your project folder, see below) in your assistant and ask in plain words:
+
+- "Set up a project in ~/my-voices with two built-in voices, narrator Karim and guide Yasmin,
+  and these sentences: …"
+- "Upload the dataset and start recording." It asks before anything that uses GPU time.
+- "Is the check done? Download the results and tell me which lines are flagged."
+- "Line 2 of the narrator sounds wrong: try صَحّ and صَحْ, two takes each."
+- "Use take narrator_002_b1 and export the audio for my app."
+
+What `AGENTS.md` tells the assistant:
+
+- **Ask you first** before `vk watch`, `vk push` or recording again, since those use your
+  GPU hours, and before the first dataset upload.
+- **Never print or copy your token.** It only checks that one exists.
+- Check progress with `vk status` (one line per notebook), at most once a minute, and read a
+  failed notebook's log with `kaggle kernels output`.
+- Only use voice clips you say you have consent for.
+
+**If your assistant works in another folder** (for example your app's repo): install the package
+into the Python it uses (`pip install -e /path/to/voicetut-kaggle`), then point it at the rules.
+In Claude Code, add this line to that folder's `CLAUDE.md`:
+
+```
+@/path/to/voicetut-kaggle/AGENTS.md
+```
+
+In Cursor or Codex, copy `AGENTS.md` into that folder, or add a line to its own `AGENTS.md` saying
+to follow `/path/to/voicetut-kaggle/AGENTS.md` for voice work.
+
 ## Development
 
 ```bash
@@ -480,4 +613,5 @@ ffmpeg). They don't touch Kaggle.
 Code map (`voicetut_kaggle/`): `config.py` reads `voices.yaml` · `dataset.py` step 1 ·
 `record.py` / `watch.py` step 2 · `check.py` steps 3 and 7 · `kaggle.py` push, status and fetch ·
 `listen.py` step 5 · `fix.py` step 6 · `merge.py` step 7 · `export.py` step 8 · `notebooks.py`
-code shared by all notebooks · `pronounce.py` the vowelling, copied into every notebook.
+code shared by all notebooks · `pronounce.py` the vowelling, copied into every notebook ·
+`desktop_project.py` / `desktop_api.py` what the desktop window (`desktop/`) reads and saves.
