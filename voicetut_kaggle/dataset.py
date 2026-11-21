@@ -70,6 +70,33 @@ def upload(cfg, message):
     else:
         kaggle.run("datasets", "create", "-p", target, "-r", "zip")
     kaggle.wait_for_dataset(ref)
+    with open(os.path.join(target, "speakers.json"), encoding="utf-8") as f:
+        version = json.load(f)["version"]
+    _write_json(_uploaded_path(cfg), {"version": version})
+
+
+def uploaded_version(cfg):
+    """The dataset version this computer last uploaded, or None when it does not know."""
+    try:
+        with open(_uploaded_path(cfg), encoding="utf-8") as f:
+            return json.load(f).get("version")
+    except FileNotFoundError:
+        return None
+
+
+def check_uploaded(cfg):
+    """Stops a recording that would fail on Kaggle: its notebooks need the dataset as it is now."""
+    uploaded, current = uploaded_version(cfg), fingerprint(cfg)
+    if uploaded is None:
+        print("note: notebooks need the dataset uploaded as it is now (vk dataset --upload)")
+    elif uploaded != current:
+        raise ValueError("the sentences or speakers changed since the last upload, so the notebooks "
+                         "would stop on Kaggle: run `vk dataset --upload` first")
+
+
+def _uploaded_path(cfg):
+    # Outside the data folder, which is what gets uploaded.
+    return os.path.join(cfg.build, "kaggle", "uploaded.json")
 
 
 def _write_json(path, data):

@@ -16,7 +16,7 @@ from collections import defaultdict
 STYLE = """body{font-family:system-ui,sans-serif;margin:24px;background:#f6f8fa;color:#222}
 table{border-collapse:collapse;background:#fff}td,th{padding:10px 12px;border-bottom:1px solid #e3e6ea;
 text-align:left;vertical-align:top}.t{font-size:19px}.h{font-size:15px;color:#a0522d;margin-top:4px}
-.n{color:#666;font-size:13px}.p{display:flex;align-items:center;gap:6px;margin:4px 0}.p b{width:26px}
+.n{color:#666;font-size:13px}.f{color:#b42318;font-size:13px;font-weight:600}.p{display:flex;align-items:center;gap:6px;margin:4px 0}.p b{width:26px}
 audio{width:220px}"""
 
 
@@ -56,19 +56,32 @@ def _flagged_page(cfg, zip_path, out_dir, compare, show_all):
     with zipfile.ZipFile(zip_path) as z:
         report = json.loads(z.read("report.json"))
     threshold = cfg.check["threshold"]
-    keys = sorted(k for k, r in report.items() if show_all or r["errors"] > threshold)
+    flagged = {k for k, r in report.items() if r["errors"] > threshold and not r.get("fixed")}
+    show_all = show_all or not flagged  # nothing flagged: an empty page helps nobody, show every line
+    keys = sorted(report if show_all else flagged)
     rows = []
     for key in keys:
         r, name = report[key], key.replace("/", "_")
         speaker, n = key.split("/")
         other = _copy(compare, f"voices/{key}.flac", out_dir, f"{name}_other.flac") if compare else ""
+        if r.get("fixed"):  # swapped in with use-take: the check's scores were for the old clip
+            mark, heard = f"<div class=n>re-recorded: {html.escape(r['fixed'])}</div>", ""
+            score = "<div class=n>not checked again</div>"
+        else:
+            mark = "<div class=f>flagged</div>" if show_all and key in flagged else ""
+            heard = f"<div dir=rtl class=h>heard: {html.escape(r['heard'])}</div>"
+            score = f"<div class=n>error {r['errors']:.2f} · take {r['take']} of {r['takes']}</div>"
         rows.append(
-            f"<tr><td class=n>{n}</td><td>{html.escape(speaker)}<div dir=rtl class=t>{html.escape(r['text'])}</div>"
-            f"<div dir=rtl class=h>heard: {html.escape(r['heard'])}</div></td>"
-            f"<td>{_copy(zip_path, f'voices/{key}.flac', out_dir, f'{name}.flac')}"
-            f"<div class=n>error {r['errors']:.2f} · take {r['take']} of {r['takes']}</div></td>"
+            f"<tr><td class=n>{n}</td><td>{html.escape(speaker)}{mark}"
+            f"<div dir=rtl class=t>{html.escape(r['text'])}</div>{heard}</td>"
+            f"<td>{_copy(zip_path, f'voices/{key}.flac', out_dir, f'{name}.flac')}{score}</td>"
             + (f"<td>{other}</td>" if compare else "") + "</tr>")
-    title = "All lines" if show_all else f"Lines the recognizer still flags ({len(keys)} of {len(report)})"
+    if not flagged:
+        title = f"Every line passed the check ({len(report)} lines)"
+    elif show_all:
+        title = f"All lines ({len(flagged)} of {len(report)} flagged)"
+    else:
+        title = f"Lines the recognizer still flags ({len(flagged)} of {len(report)})"
     other_head = f"<th>{html.escape(os.path.basename(compare))}</th>" if compare else ""
     return (f"<h2>{title}</h2><p>Brown: what the speech recognizer heard. Error: share of letters that "
             f"differ (0 = exact; flagged above {threshold}). Many flags are only spelling: trust your ears. "

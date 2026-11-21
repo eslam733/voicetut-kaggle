@@ -8,6 +8,11 @@ from . import check, config, dataset, export, fix, kaggle, listen, merge, record
 
 OUTPUTS = {"check": ["voices_checked.zip"], "new-lines": ["voices_checked.zip"], "fix": ["fix.zip"]}
 RANGE = re.compile(r"^(\d+)-(\d+)$")
+NOT_FINISHED = {
+    "RUNNING": "download it when it is COMPLETE (try again in a few minutes)",
+    "NONE": "it was never started",
+    "ERROR": "it failed; open it on kaggle.com to see the log",
+}
 
 
 def line_range(text):
@@ -26,13 +31,22 @@ def cmd_dataset(cfg, args):
 
 
 def cmd_record(cfg, args):
+    dataset.check_uploaded(cfg)
     record.build(cfg)
     check.build(cfg)
+    watch.forget(cfg)
     print("start them with: vk watch   (or one at a time: vk push part1)")
 
 
 def cmd_watch(cfg, args):
-    watch.watch(cfg, args.parts, start_check=not args.no_check)
+    watch.watch(cfg, args.parts, start_check=not args.no_check, resume=args.resume)
+
+
+def cmd_status(cfg, args):
+    """One line: what Kaggle says about each notebook of this project (asks once, no waiting)."""
+    names = record.part_names(cfg) + ["check"]
+    names += [n for n in ("fix", "new-lines") if os.path.isdir(os.path.join(cfg.build, "kaggle", n))]
+    print("  ".join(f"{n}={kaggle.kernel_status(cfg.ref(cfg.kernel_slug(n)))}" for n in names))
 
 
 def cmd_push(cfg, args):
@@ -47,6 +61,9 @@ def cmd_fetch(cfg, args):
     files = args.files or OUTPUTS.get(args.notebook, ["voices.zip"])
     slug = cfg.kernel_slug(args.notebook)
     out_dir = args.out or os.path.join(cfg.build, "out", args.notebook)
+    status = kaggle.kernel_status(cfg.ref(slug))
+    if status != "COMPLETE":
+        sys.exit(f"{slug} is {status} on Kaggle, not finished: {NOT_FINISHED.get(status, NOT_FINISHED['RUNNING'])}")
     os.makedirs(out_dir, exist_ok=True)
     found = kaggle.find_output_files(cfg.username, slug, set(files))
     missing = sorted(set(files) - found.keys())
@@ -97,13 +114,19 @@ def parser():
     s.set_defaults(run=cmd_record)
 
     s = sub.add_parser("watch", help="2. push the parts as GPU slots free up, then the check")
-    s.add_argument("--parts", nargs="+", metavar="partN", help="only these parts (default: all)")
+    which = s.add_mutually_exclusive_group()
+    which.add_argument("--parts", nargs="+", metavar="partN", help="only these parts (default: all)")
+    which.add_argument("--resume", action="store_true",
+                       help="follow the run already started: push only what was not pushed yet")
     s.add_argument("--no-check", action="store_true", help="don't start the check at the end")
     s.set_defaults(run=cmd_watch)
 
     s = sub.add_parser("push", help="3. start one built notebook on Kaggle (part1, check, fix, new-lines)")
     s.add_argument("notebook")
     s.set_defaults(run=cmd_push)
+
+    s = sub.add_parser("status", help="3. what Kaggle says about each notebook now (NONE: never started)")
+    s.set_defaults(run=cmd_status)
 
     s = sub.add_parser("fetch", help="4. download a notebook's output (only the files you need)")
     s.add_argument("notebook", help="part1, check, fix or new-lines")
