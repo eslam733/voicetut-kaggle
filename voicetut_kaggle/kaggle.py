@@ -90,6 +90,15 @@ def _auth():
     raise KaggleError("no Kaggle credentials: put your API token in ~/.kaggle/access_token (see README)")
 
 
+def has_credentials():
+    """True when any login the code accepts is present. Never returns or prints the token."""
+    try:
+        _auth()
+    except (KaggleError, KeyError, ValueError):
+        return False
+    return True
+
+
 def _read(path):
     try:
         with open(path) as f:

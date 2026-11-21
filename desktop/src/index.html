@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoiceTut Kaggle</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>VoiceTut Kaggle</h1>
+      <p class="muted">Record voice lines on Kaggle's free GPUs.</p>
+    </header>
+
+    <div class="statusbar">
+      <p id="status" class="status">Nothing running.</p>
+      <p id="notebooks" class="notebooks" hidden></p>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Steps">
+      <button id="tab-setup" role="tab" data-tab="setup" aria-controls="panel-setup" type="button">1 · Setup</button>
+      <button id="tab-record" role="tab" data-tab="record" aria-controls="panel-record" type="button">2 · Record</button>
+      <button id="tab-results" role="tab" data-tab="results" aria-controls="panel-results" type="button">3 · Results</button>
+      <button id="tab-fix" role="tab" data-tab="fix" aria-controls="panel-fix" type="button">4 · Fix lines</button>
+    </nav>
+
+    <div id="panel-setup" class="panel" role="tabpanel" aria-labelledby="tab-setup">
+      <section>
+        <h2>Project</h2>
+        <label>Folder
+          <span class="row">
+            <input id="folder" spellcheck="false">
+            <button id="choose-folder" type="button">Choose…</button>
+            <button id="open-folder" type="button">Open</button>
+          </span>
+        </label>
+        <div class="pair">
+          <label>Project name
+            <input id="project" spellcheck="false" placeholder="my-voices">
+          </label>
+          <label>Kaggle username
+            <input id="username" spellcheck="false" placeholder="the name in kaggle.com/&lt;name&gt;">
+          </label>
+        </div>
+        <p id="project-problem" class="error" hidden></p>
+      </section>
+
+      <section>
+        <h2>Kaggle token</h2>
+        <p id="token-status" class="muted">Checking the Kaggle token…</p>
+        <label>Add or replace the token
+          <span class="row">
+            <input id="token" type="password" autocomplete="off" spellcheck="false"
+                   placeholder="Paste the token from kaggle.com → Settings → API">
+            <button id="save-token" type="button">Save token</button>
+            <button id="choose-token" type="button">From file…</button>
+          </span>
+        </label>
+        <p class="muted small">Saved in ~/.kaggle on this computer, readable only by you. It is never
+          shown or written to the log. A new token replaces the old one.</p>
+      </section>
+
+      <section>
+        <h2>Speakers</h2>
+        <div id="speakers"></div>
+        <button id="add-speaker" type="button">Add speaker</button>
+        <p class="muted small">A clip is 5–15 seconds of one person, with the exact words said in it.
+          Only use a voice you have the speaker's consent for.</p>
+      </section>
+
+      <section>
+        <h2>Lines</h2>
+        <textarea id="lines" rows="7" dir="auto" placeholder="One sentence per line"></textarea>
+        <p id="own-note" class="muted small">Every speaker says these lines.</p>
+      </section>
+
+      <p class="row"><button id="save" type="button" class="primary">Save project</button></p>
+    </div>
+
+    <div id="panel-record" class="panel" role="tabpanel" aria-labelledby="tab-record" hidden>
+      <section>
+        <h2>Record on Kaggle</h2>
+        <p class="row">
+          <button id="upload" type="button">Upload</button>
+          <button id="record" type="button" class="primary">Start recording</button>
+          <button id="resume" type="button" class="primary" hidden>Resume</button>
+          <button id="restart" type="button" hidden>Start over</button>
+          <button id="stop" type="button" hidden>Stop</button>
+        </p>
+        <p class="muted small">Start recording saves the project, uploads it when Kaggle has an older
+          version, then starts the recording notebooks and the check. The status above updates every
+          minute while they run.</p>
+      </section>
+    </div>
+
+    <div id="panel-results" class="panel" role="tabpanel" aria-labelledby="tab-results" hidden>
+      <section>
+        <h2>Results</h2>
+        <p class="row">
+          <button id="download" type="button">Download results</button>
+          <button id="listen" type="button">Listen</button>
+          <button id="export" type="button">Export…</button>
+        </p>
+        <p class="muted small">Download when the check is COMPLETE. Listen opens every line in your
+          browser. Export writes small Opus files for your app.</p>
+      </section>
+    </div>
+
+    <div id="panel-fix" class="panel" role="tabpanel" aria-labelledby="tab-fix" hidden>
+      <p id="fix-empty" class="muted">Save a project and record it first.</p>
+      <section id="fix-step" hidden>
+        <h2>Fix lines</h2>
+        <p class="muted small">For a line that sounds wrong after you listen: write it the way it should
+          be said, with the vowel marks you want. Put a few spellings, one per line; Kaggle records each
+          a few times and you pick the best by ear.</p>
+        <div id="fixes"></div>
+        <p class="row">
+          <button id="add-fix" type="button">Add a line to fix</button>
+          <span class="muted small">Takes per spelling</span>
+          <select id="fix-takes" class="narrow"></select>
+        </p>
+        <p class="row">
+          <button id="record-fixes" type="button" class="primary">Record fixes</button>
+          <button id="download-takes" type="button">Download takes</button>
+          <button id="listen-takes" type="button">Listen to takes</button>
+        </p>
+        <div id="takes"></div>
+        <p class="row"><button id="use-takes" type="button" class="primary" hidden>Use the picked takes</button></p>
+      </section>
+    </div>
+
+    <details class="log-section" open>
+      <summary>Log</summary>
+      <pre id="log" dir="auto"></pre>
+    </details>
+  </main>
+
+  <template id="speaker-row">
+    <div class="speaker">
+      <input class="speaker-id" spellcheck="false" placeholder="id, e.g. narrator">
+      <select class="speaker-mode">
+        <option value="builtin">Built-in voice</option>
+        <option value="clip">Voice clip</option>
+        <option value="instruct">Voice description</option>
+      </select>
+      <span class="speaker-value"></span>
+      <button class="remove" type="button" title="Remove speaker">Remove</button>
+    </div>
+  </template>
+
+  <template id="fix-row">
+    <div class="fix">
+      <select class="fix-speaker"></select>
+      <select class="fix-line" dir="auto"></select>
+      <button class="remove" type="button">Remove</button>
+      <textarea class="fix-spellings" rows="3" dir="auto" spellcheck="false"
+                placeholder="One spelling per line, with vowel marks"></textarea>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+  <script src="fix.js"></script>
+</body>
+</html>

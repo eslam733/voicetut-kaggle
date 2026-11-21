@@ -76,7 +76,11 @@ def build(cfg, path):
 
 
 def use_takes(cfg, fix_zip, base_zip, out_zip, names):
-    """Copies base_zip to out_zip with the picked takes (e.g. narrator_003_b2) in place of the clips."""
+    """Copies base_zip to out_zip with the picked takes (e.g. narrator_003_b2) in place of the clips.
+
+    Returns {sentence without marks: the spelling picked}, the pronunciation "lines" entries that
+    keep these spellings for future recordings.
+    """
     with zipfile.ZipFile(fix_zip) as fix:
         said = json.loads(fix.read("fix/said.json"))
         unknown = [n for n in names if n not in said]
@@ -84,14 +88,28 @@ def use_takes(cfg, fix_zip, base_zip, out_zip, names):
             raise ValueError(f"not in {fix_zip}: {unknown}; the takes are {sorted(said)[:6]}...")
         picked = {f"voices/{said[n]['speaker']}/{said[n]['line']:03d}.flac": fix.read(f"fix/{n}.flac")
                   for n in names}
+    fixed = {f"{said[n]['speaker']}/{said[n]['line']:03d}": n for n in names}
     with zipfile.ZipFile(base_zip) as base, zipfile.ZipFile(out_zip, "w", zipfile.ZIP_STORED) as out:
         missing = sorted(set(picked) - set(base.namelist()))
         if missing:
             raise ValueError(f"{base_zip} has no {missing}")
         for name in base.namelist():
-            out.writestr(name, picked.get(name) or base.read(name))
+            data = picked.get(name) or base.read(name)
+            if name == "report.json":
+                data = _mark_fixed(data, fixed)
+            out.writestr(name, data)
     print(f"{len(picked)} clip(s) swapped -> {out_zip}")
+    lines = {plain(cfg.lines(said[n]["speaker"])[said[n]["line"]]): said[n]["text"] for n in names}
     print("To keep these spellings for future recordings, add them to the pronunciation file's \"lines\":")
-    for n in names:
-        sentence = plain(cfg.lines(said[n]["speaker"])[said[n]["line"]])
-        print(f"  {json.dumps(sentence, ensure_ascii=False)}: {json.dumps(said[n]['text'], ensure_ascii=False)},")
+    for sentence, text in lines.items():
+        print(f"  {json.dumps(sentence, ensure_ascii=False)}: {json.dumps(text, ensure_ascii=False)},")
+    return lines
+
+
+def _mark_fixed(report_json, fixed):
+    """The check's scores no longer describe a swapped clip: note which take replaced it."""
+    report = json.loads(report_json)
+    for key, take in fixed.items():
+        if key in report:
+            report[key]["fixed"] = take
+    return json.dumps(report, ensure_ascii=False, indent=1)
