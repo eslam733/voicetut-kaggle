@@ -416,6 +416,8 @@ account page.
 
 ## Troubleshooting
 
+**`ModuleNotFoundError: No module named 'six'` on `vk dataset --upload`.** Kaggle 2.2.5 imports `six` and does not install it. Install this project again (`pip install -e .`); `six` is one of its dependencies.
+
 **HTTP 429 (Too Many Requests) when downloading output.** `kaggle kernels output` lists 20 files
 per request and walks through the whole output, so a notebook with thousands of files trips the
 rate limit. Use `vk fetch`, which asks for 500 per request and stops early. If you still get a
