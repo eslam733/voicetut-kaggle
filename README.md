@@ -169,6 +169,7 @@ Adding lines later is only on the `vk` command for now (see
 | *check is RUNNING on Kaggle, not finished* after Download | Wait. The status line says when the check is complete. |
 | A notebook tag says *error* | Open it on kaggle.com for the log, then **Start over**. |
 | *both Kaggle GPU slots are busy* | Another notebook is running on your account. Wait for it, or stop it on kaggle.com. |
+| A notebook stays *waiting* with no other notebook running | Kaggle sometimes doesn't start a queued run. Leave it: after 15 minutes `vk watch` pushes it again (the Log says *had not started … pushed it again*). |
 | The window doesn't open from the menu | Run `~/.local/share/voicetut-kaggle/voicetut-kaggle-desktop` in a terminal and read the error. |
 
 The app keeps everything in your project folder, as `vk` does (`voices.yaml`, the sentences,

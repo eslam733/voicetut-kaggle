@@ -4,6 +4,10 @@ Kaggle runs at most two GPU notebooks at once and refuses a third push with "Max
 session count"; this keeps trying every few minutes. Stop it any time with Ctrl+C: what is already
 running on Kaggle keeps running, and `vk watch --resume` follows the same run again without
 pushing anything twice (build/kaggle/watch-state.json remembers what was pushed).
+
+Kaggle sometimes leaves a pushed notebook QUEUED for good even with a GPU slot free; pushing it
+again starts it. So a notebook QUEUED for STUCK_AFTER seconds is pushed again (Kaggle refuses the
+push while both GPU slots are really busy, and then it just keeps waiting).
 """
 import json
 import os
@@ -13,6 +17,7 @@ from . import kaggle, record
 
 DONE, FAILED = {"COMPLETE"}, {"ERROR", "CANCEL_REQUESTED", "CANCEL_ACKNOWLEDGED"}
 STARTED = {"QUEUED", "RUNNING"}
+STUCK_AFTER = 15 * 60
 
 
 def state_path(cfg):
@@ -42,6 +47,33 @@ def _save_state(cfg, state):
         json.dump(state, f)
 
 
+def _push_again_if_stuck(cfg, status, queued_since):
+    """status: {name: Kaggle status}; queued_since: {name: when first seen QUEUED}, kept by the caller."""
+    now = time.monotonic()
+    for name, s in status.items():
+        if s != "QUEUED":
+            queued_since.pop(name, None)
+            continue
+        waited = now - queued_since.setdefault(name, now)
+        if waited < STUCK_AFTER:
+            continue
+        queued_since[name] = now
+        if kaggle.push(os.path.join(cfg.build, "kaggle", name)):
+            minutes = f"{waited // 60:.0f}"
+            print(f"{time.strftime('%H:%M')} {name} had not started after {minutes} min: pushed it again")
+
+
+def _wait_until_started(cfg, name, every):
+    """Waits while Kaggle has not started the notebook yet (NONE: just pushed, not listed yet)."""
+    queued_since = {}
+    while True:
+        status = kaggle.kernel_status(cfg.ref(cfg.kernel_slug(name)))
+        if status not in ("QUEUED", "NONE"):
+            return status
+        _push_again_if_stuck(cfg, {name: "QUEUED"}, queued_since)  # NONE for that long: push again too
+        time.sleep(every)
+
+
 def watch(cfg, parts=None, start_check=True, every=300, resume=False):
     """[parts]: the part names still to push (default: all of them).
 
@@ -56,6 +88,7 @@ def watch(cfg, parts=None, start_check=True, every=300, resume=False):
         state = {"pushed": [name for name in names if name not in pending], "check_pushed": False}
     _save_state(cfg, state)
     seen_started = set(names) - set(pending)  # parts not pushed now count as started already
+    queued_since = {}
     while True:
         for name in list(pending):
             if kaggle.push(os.path.join(cfg.build, "kaggle", name)):
@@ -74,14 +107,18 @@ def watch(cfg, parts=None, start_check=True, every=300, resume=False):
         finished = not pending and all(status[n] in DONE and n in seen_started for n in names)
         if finished:
             break
+        _push_again_if_stuck(cfg, {n: s for n, s in status.items() if n not in pending}, queued_since)
         time.sleep(every)
     print("every part is done")
     check_ref = cfg.ref(cfg.kernel_slug("check"))
-    if start_check and state["check_pushed"]:
-        print(f"check was already started: follow it with `kaggle kernels status {check_ref}`")
-    elif start_check:
+    if not start_check:
+        return
+    if state["check_pushed"]:
+        print("check was already pushed")
+    else:
         while not kaggle.push(os.path.join(cfg.build, "kaggle", "check")):
             time.sleep(every)
         state["check_pushed"] = True
         _save_state(cfg, state)
-        print(f"check started: follow it with `kaggle kernels status {check_ref}`")
+    status = _wait_until_started(cfg, "check", every)
+    print(f"check is {status}: follow it with `kaggle kernels status {check_ref}`")

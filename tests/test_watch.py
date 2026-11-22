@@ -16,9 +16,12 @@ DEMO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 class FakeKaggle:
     """Each pushed notebook runs straight away and is COMPLETE on the next status call."""
 
-    def __init__(self, busy=0):
+    def __init__(self, busy=0, stuck=(), queued_polls=0):
         self.pushed = []
         self.busy = busy  # how many pushes are refused first with "both GPU slots are busy"
+        self.stuck = set(stuck)  # notebooks whose first push stays QUEUED for good
+        self.queued_polls = queued_polls  # status calls every push stays QUEUED before it runs
+        self.waits = {}
         self.status = {}
 
     def push(self, folder):
@@ -27,13 +30,19 @@ class FakeKaggle:
             return False
         name = os.path.basename(folder)
         self.pushed.append(name)
-        self.status[name] = "RUNNING"
+        self.status[name] = "QUEUED" if name in self.stuck or self.queued_polls else "RUNNING"
+        self.waits[name] = float("inf") if name in self.stuck else self.queued_polls
+        self.stuck.discard(name)
         return True
 
     def kernel_status(self, ref):
         name = ref.rsplit("-", 1)[1]
         status = self.status.get(name, "NONE")
-        if status == "RUNNING":
+        if status == "QUEUED":
+            self.waits[name] -= 1
+            if self.waits[name] <= 0:
+                self.status[name] = "RUNNING"
+        elif status == "RUNNING":
             self.status[name] = "COMPLETE"
         return status
 
@@ -58,9 +67,15 @@ class Watch(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def run_watch(self, fake, **options):
+        clock = [0]
+
+        def sleep(seconds):
+            clock[0] += seconds
+
         with mock.patch.object(watch.kaggle, "push", fake.push), \
                 mock.patch.object(watch.kaggle, "kernel_status", fake.kernel_status), \
-                mock.patch.object(watch.time, "sleep"):
+                mock.patch.object(watch.time, "sleep", sleep), \
+                mock.patch.object(watch.time, "monotonic", lambda: clock[0]):
             watch.watch(self.cfg, **options)
 
     def test_pushes_every_part_then_the_check_and_remembers_it(self):
@@ -78,6 +93,27 @@ class Watch(unittest.TestCase):
 
         self.assertEqual(fake.pushed, ["part2", "part1", "check"])
 
+    def test_a_part_stuck_in_the_queue_is_pushed_again(self):
+        fake = FakeKaggle(stuck={"part1"})
+
+        self.run_watch(fake)
+
+        self.assertEqual(fake.pushed, ["part1", "part2", "part1", "check"])
+
+    def test_a_check_stuck_in_the_queue_is_pushed_again(self):
+        fake = FakeKaggle(stuck={"check"})
+
+        self.run_watch(fake)
+
+        self.assertEqual(fake.pushed, ["part1", "part2", "check", "check"])
+
+    def test_a_short_wait_in_the_queue_is_left_alone(self):
+        fake = FakeKaggle(queued_polls=2)  # 2 polls 5 minutes apart: under the 15 minutes
+
+        self.run_watch(fake)
+
+        self.assertEqual(fake.pushed, ["part1", "part2", "check"])
+
     def test_resume_pushes_only_what_was_not_pushed(self):
         first = FakeKaggle()
         with mock.patch.object(watch.kaggle, "push", first.push), \
@@ -94,7 +130,7 @@ class Watch(unittest.TestCase):
     def test_resume_after_the_check_started_pushes_nothing(self):
         self.run_watch(FakeKaggle())
         again = FakeKaggle()
-        again.status = {"part1": "COMPLETE", "part2": "COMPLETE"}
+        again.status = {"part1": "COMPLETE", "part2": "COMPLETE", "check": "RUNNING"}
 
         self.run_watch(again, resume=True)
 
