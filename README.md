@@ -1,7 +1,8 @@
-# voicetut-kaggle
+# voicetut-studio
 
 Record hundreds or thousands of **Egyptian Arabic** voice lines, in as many voices as you like,
-on **Kaggle's free GPUs**, with every line checked by speech recognition.
+on **Kaggle's free GPUs**, with every line checked by speech recognition. Lines can also be recorded
+with [ElevenLabs](#record-with-elevenlabs-instead-paid-fast) (paid, faster).
 
 - **Voices:** [VoiceTut-TTS](https://huggingface.co/mohammedaly22/VoiceTut-TTS) clones a voice from
   a short clip, or uses one of its built-in voices.
@@ -78,11 +79,11 @@ are named `voices/<speaker>/<nnn>.flac`, for example `voices/guide/003.flac`.
 ## Install
 
 ```bash
-git clone https://github.com/eslam733/voicetut-kaggle.git
+git clone https://github.com/eslam733/voicetut-studio.git
 ```
 
 ```bash
-cd voicetut-kaggle && python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+cd voicetut-studio && python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 ```
 
 This installs the `vk` command, plus `pyyaml`, `requests` and the official `kaggle` CLI. Check
@@ -105,7 +106,7 @@ command line at any time.
 On Debian or Ubuntu, after cloning the repo:
 
 ```bash
-cd voicetut-kaggle && desktop/install.sh
+cd voicetut-studio && desktop/install.sh
 ```
 
 - If system packages are missing, the script prints one `sudo apt-get install -y …` line and
@@ -656,15 +657,15 @@ What `AGENTS.md` tells the assistant:
 - Only use voice clips you say you have consent for.
 
 **If your assistant works in another folder** (for example your app's repo): install the package
-into the Python it uses (`pip install -e /path/to/voicetut-kaggle`), then point it at the rules.
+into the Python it uses (`pip install -e /path/to/voicetut-studio`), then point it at the rules.
 In Claude Code, add this line to that folder's `CLAUDE.md`:
 
 ```
-@/path/to/voicetut-kaggle/AGENTS.md
+@/path/to/voicetut-studio/AGENTS.md
 ```
 
 In Cursor or Codex, copy `AGENTS.md` into that folder, or add a line to its own `AGENTS.md` saying
-to follow `/path/to/voicetut-kaggle/AGENTS.md` for voice work.
+to follow `/path/to/voicetut-studio/AGENTS.md` for voice work.
 
 ## Development
 

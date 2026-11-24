@@ -1,4 +1,4 @@
-# Working with voicetut-kaggle (for AI assistants)
+# Working with voicetut-studio (for AI assistants)
 
 This repo records voice lines with VoiceTut-TTS on Kaggle's GPUs and checks them with speech
 recognition. Drive it with the `vk` command. Don't write or edit Kaggle notebooks by hand: `vk`
