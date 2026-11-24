@@ -49,6 +49,9 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 | `vk use-take <fix.zip> <base.zip> <out.zip> <take>...` | swaps picked takes in, prints spellings to keep | none |
 | `vk new-lines FIRST-LAST`, `vk push new-lines`, `vk merge ...` | records lines added later without renumbering | **GPU** for the push |
 | `vk export <zip> [--out DIR]` | small Opus files and `lines.json` for an app (needs ffmpeg) | none |
+| `vk eleven credits` | characters left on the user's ElevenLabs plan | none |
+| `vk eleven voices [--list]` | clones each speaker's clip into an ElevenLabs voice once (or lists the account's voices) | ElevenLabs voice slots |
+| `vk eleven record FIRST-LAST` or `--fixes FILE` | records takes with ElevenLabs into `build/out/eleven/eleven.zip` (fix.zip form) | **the user's paid characters**: it asks first |
 
 Line `n` of a speaker is the shared sentences first, then that speaker's own sentences. Takes are
 named `<speaker>_<nnn>_<variant><take>`, for example `narrator_002_b1`.
@@ -70,6 +73,12 @@ with vowel marks, takes), then `vk fix fixes.yaml`, ask, `vk push fix`, wait for
 `vk fetch fix`, `vk listen build/out/fix/fix.zip --compare build/out/check/voices_checked.zip`,
 and `vk use-take` with the take the user picks. Add the printed spelling to the pronunciation
 file's `"lines"` so later recordings use it.
+
+With ElevenLabs instead of Kaggle (paid, no GPU): `vk eleven credits`, `vk eleven voices`, then
+`vk eleven record FIRST-LAST` (or `--fixes fixes.yaml`). It prints the characters it will spend
+and asks; run it with `--yes` only after the user agreed to that number. Then `vk listen
+build/out/eleven/eleven.zip --compare <voices zip>`: the user presses **use** on the takes they
+want, and the page shows the `vk use-take` command to run. Never print or commit the API key.
 
 ## When a notebook fails
 

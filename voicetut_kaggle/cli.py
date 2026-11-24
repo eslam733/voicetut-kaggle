@@ -4,7 +4,7 @@ import os
 import re
 import sys
 
-from . import check, config, dataset, export, fix, kaggle, listen, merge, record, watch
+from . import check, config, dataset, eleven, export, fix, kaggle, listen, merge, record, watch
 
 OUTPUTS = {"check": ["voices_checked.zip"], "new-lines": ["voices_checked.zip"], "fix": ["fix.zip"]}
 RANGE = re.compile(r"^(\d+)-(\d+)$")
@@ -100,6 +100,35 @@ def cmd_export(cfg, args):
     export.export(cfg, args.zip, args.out or os.path.join(cfg.build, "app_audio"))
 
 
+def cmd_eleven_credits(cfg, args):
+    used, limit, tier = eleven.credits(cfg)
+    print(f"{tier} plan: {used} of {limit} characters used, {max(0, limit - used)} left")
+
+
+def cmd_eleven_voices(cfg, args):
+    if args.list:
+        for name, voice_id, category in eleven.account_voices(cfg):
+            print(f"{voice_id}  {name}  ({category})")
+        return
+    if args.delete:
+        eleven.delete_voices(cfg, args.speakers)
+        return
+    eleven.make_voices(cfg, args.speakers, args.redo, args.from_zip, args.seconds)
+
+
+def cmd_eleven_record(cfg, args):
+    if bool(args.lines) == bool(args.fixes):
+        sys.exit("give either the lines (FIRST-LAST) or --fixes FILE")
+    if args.fixes:
+        jobs = eleven.fix_jobs(cfg, args.fixes, args.speakers, args.takes)
+    else:
+        jobs = eleven.line_jobs(cfg, *args.lines, args.speakers, args.takes)
+    out = args.out or os.path.join(cfg.build, "out", "eleven", "eleven.zip")
+    changes = {"stability": args.stability} if args.stability is not None else None
+    eleven.record(cfg, jobs, out, yes=args.yes, settings=changes)
+    print(f"listen and pick: vk listen {out} --compare <the voices zip in use>")
+
+
 def parser():
     p = argparse.ArgumentParser(prog="vk", description="Clone voices and record lines on Kaggle's free GPUs.")
     p.add_argument("-c", "--config", default="voices.yaml", help="the project file (default: ./voices.yaml)")
@@ -163,6 +192,30 @@ def parser():
     s.add_argument("out_zip")
     s.set_defaults(run=cmd_merge)
 
+    s = sub.add_parser("eleven", help="record with ElevenLabs instead of Kaggle (paid, fast): vk eleven --help")
+    el = s.add_subparsers(dest="eleven_command", required=True, metavar="step")
+    e = el.add_parser("credits", help="characters left on your ElevenLabs plan")
+    e.set_defaults(run=cmd_eleven_credits)
+    e = el.add_parser("voices", help="clone each speaker's clip into an ElevenLabs voice (once)")
+    e.add_argument("--speakers", nargs="+", help="only these speakers")
+    e.add_argument("--redo", action="store_true", help="clone again even if already cloned")
+    e.add_argument("--list", action="store_true", help="list the voices in your account instead")
+    e.add_argument("--from-zip", help="clone from the speaker's own lines in this voices zip, not the clip")
+    e.add_argument("--seconds", type=int, default=60, help="with --from-zip: how much of their lines (default 60)")
+    e.add_argument("--delete", action="store_true",
+                   help="delete the voices cloned here (or --speakers') to free voice slots; recordings stay")
+    e.set_defaults(run=cmd_eleven_voices)
+    e = el.add_parser("record", help="record lines FIRST-LAST (or --fixes spellings) into a fix-style zip")
+    e.add_argument("lines", nargs="?", type=line_range, metavar="FIRST-LAST")
+    e.add_argument("--fixes", help="YAML file of spellings to try, as for vk fix")
+    e.add_argument("--speakers", nargs="+", help="only these speakers")
+    e.add_argument("--takes", type=int, help="takes per line (default: eleven.takes)")
+    e.add_argument("--stability", type=float, choices=[0, 0.5, 1],
+                   help="this run only: 0 creative (most expressive), 0.5 natural, 1 robust")
+    e.add_argument("--yes", action="store_true", help="don't ask before spending characters")
+    e.add_argument("--out", help="zip (default: build/out/eleven/eleven.zip)")
+    e.set_defaults(run=cmd_eleven_record)
+
     s = sub.add_parser("export", help="8. convert a voices zip to small Opus files for an app")
     s.add_argument("zip")
     s.add_argument("--out", help="folder (default: build/app_audio)")
@@ -175,7 +228,7 @@ def main(argv=None):
     try:
         cfg = config.load(args.config)
         args.run(cfg, args)
-    except (config.ConfigError, kaggle.KaggleError, ValueError, OSError) as e:
+    except (config.ConfigError, kaggle.KaggleError, eleven.ElevenError, ValueError, OSError) as e:
         sys.exit(f"error: {e}")
     except KeyboardInterrupt:
         sys.exit("stopped (notebooks already started keep running on Kaggle)")
