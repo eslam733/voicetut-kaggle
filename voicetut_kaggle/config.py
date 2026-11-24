@@ -21,6 +21,20 @@ DEFAULTS = {
     "recording": {"parts": 1, "num_step": 48, "hours": 11},
     "check": {"threshold": 0.15, "max_takes": 4},
     "export": {"bitrate": "20k", "format": "webm"},
+    # ElevenLabs (vk eleven): paid, fast, no GPU. See eleven.py.
+    "eleven": {
+        "model": "eleven_v3",
+        "language": "ar",  # language_code sent with each line; "" sends none
+        "takes": 2,
+        "stability": 0.5,  # eleven_v3 takes only 0 (creative), 0.5 (natural) or 1 (robust)
+        "similarity": 0.75,
+        "style": 0.0,
+        "speed": 1.0,
+        "vowels": True,  # give the voice the pronunciation file's vowel marks
+        "at_once": 2,  # requests in parallel (plans allow 2 to 15)
+        "key_file": "~/.config/elevenlabs/api_key",
+        "voices": {},  # speaker id -> a voice id made on elevenlabs.io (else `vk eleven voices` clones the clip)
+    },
 }
 TOP_KEYS = {"project", "kaggle", "speakers", "sentences", "pronunciation", *DEFAULTS}
 
@@ -49,6 +63,7 @@ class Config:
     recording: dict
     check: dict
     export: dict
+    eleven: dict
 
     @property
     def build(self):
@@ -86,6 +101,9 @@ def load(path):
     shared, own = _sentences(_required(raw, "sentences"), folder, ids)
     sections = {name: _section(raw, name) for name in DEFAULTS}
     _check_numbers(sections, len(speakers))
+    strangers = sorted(set(sections["eleven"]["voices"]) - set(ids))
+    if strangers:
+        raise ConfigError(f"voices.yaml: eleven.voices has unknown speaker id(s) {strangers}")
     return Config(
         folder=folder,
         project=_matching(raw, "project", SLUG, "lowercase letters, digits and dashes, 3-41 long"),
@@ -198,6 +216,7 @@ def _section(raw, name):
 
 def _check_numbers(sections, speaker_count):
     rec, check, export = sections["recording"], sections["check"], sections["export"]
+    el = sections["eleven"]
     rules = [
         (isinstance(rec["parts"], int) and 1 <= rec["parts"] <= speaker_count,
          f"recording.parts must be 1..{speaker_count} (one notebook needs at least one speaker)"),
@@ -209,6 +228,15 @@ def _check_numbers(sections, speaker_count):
         (isinstance(check["max_takes"], int) and 1 <= check["max_takes"] <= 10, "check.max_takes must be 1..10"),
         (BITRATE.match(str(export["bitrate"])), "export.bitrate must look like 20k"),
         (export["format"] in AUDIO_FORMATS, f"export.format must be one of {list(AUDIO_FORMATS)}"),
+        (isinstance(el["takes"], int) and 1 <= el["takes"] <= 10, "eleven.takes must be 1..10"),
+        (isinstance(el["at_once"], int) and 1 <= el["at_once"] <= 15, "eleven.at_once must be 1..15"),
+        (all(isinstance(el[k], (int, float)) and 0 <= el[k] <= 1 for k in ("stability", "similarity", "style")),
+         "eleven.stability, similarity and style must be between 0 and 1"),
+        (not str(el["model"]).startswith("eleven_v3") or el["stability"] in (0, 0.5, 1),
+         "eleven.stability must be 0, 0.5 or 1 for eleven_v3"),
+        (isinstance(el["speed"], (int, float)) and 0.7 <= el["speed"] <= 1.2, "eleven.speed must be 0.7..1.2"),
+        (isinstance(el["voices"], dict) and all(isinstance(v, str) and v for v in el["voices"].values()),
+         "eleven.voices must map speaker ids to voice ids"),
     ]
     for ok, message in rules:
         if not ok:

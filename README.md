@@ -33,11 +33,12 @@ fixed sentences fits: games, lessons, audio guides, voice prompts.
 8. [The project file](#the-project-file-voicesyaml)
 9. [Fixing pronunciation](#fixing-pronunciation)
 10. [Adding lines later](#adding-lines-later)
-11. [Kaggle limits](#kaggle-limits)
-12. [Troubleshooting](#troubleshooting)
-13. [Licenses](#licenses)
-14. [Using it with an AI assistant](#using-it-with-an-ai-assistant)
-15. [Development](#development)
+11. [Record with ElevenLabs instead (paid, fast)](#record-with-elevenlabs-instead-paid-fast)
+12. [Kaggle limits](#kaggle-limits)
+13. [Troubleshooting](#troubleshooting)
+14. [Licenses](#licenses)
+15. [Using it with an AI assistant](#using-it-with-an-ai-assistant)
+16. [Development](#development)
 
 ## How it works
 
@@ -364,8 +365,10 @@ vk fix fixes.yaml && vk push fix
 vk fetch fix && vk listen build/out/fix/fix.zip --compare build/out/check/voices_checked.zip
 ```
 
-Takes are named `<speaker>_<line>_<spelling letter><take>`, for example `guide_002_b1`. Swap the
-ones you like into a new zip:
+Takes are named `<speaker>_<line>_<spelling letter><take>`, for example `guide_002_b1`. On the
+page, press **use** on the take you like in each row (**keep** leaves the clip in use now). The
+page remembers your picks and writes the `use-take` command for them at the bottom, ready to copy.
+Or swap takes into a new zip by name:
 
 ```bash
 vk use-take build/out/fix/fix.zip build/out/check/voices_checked.zip voices_final.zip guide_002_b1
@@ -426,6 +429,7 @@ export:    {bitrate: 20k, format: webm}
 | `check.threshold` | 0.15 | Re-record when more than this share of letters is heard wrong. |
 | `check.max_takes` | 4 | The first recording plus up to 3 new takes; the best take is kept. |
 | `export.bitrate` / `format` | `20k` / `webm` | Opus bitrate, and `webm` or `ogg`. |
+| `eleven.*` | see below | Only for `vk eleven`: [Record with ElevenLabs](#record-with-elevenlabs-instead-paid-fast). |
 
 **`sentences.json`** is either a plain list (every speaker says every line):
 
@@ -496,6 +500,68 @@ vk fetch new-lines && vk merge voices_final.zip build/out/new-lines/voices_check
 `merge` shifts the old per-speaker clips up and slots the new ones in, so `voices_new.zip`
 matches the new `sentences.json` line for line. The new-lines notebook records the lines itself
 (it needs no recordings as input) and checks them with the same re-take rules.
+
+## Record with ElevenLabs instead (paid, fast)
+
+Kaggle is free but slow, and its voices sometimes drift on short, emotional lines. ElevenLabs
+records the same lines in seconds with your paid plan's characters. Both end in the same kind of
+zip, so you can record a line both ways and pick the better one by ear.
+
+1. **Your API key.** Make one on elevenlabs.io (profile > API keys) and save it in
+   `~/.config/elevenlabs/api_key` (or set `$ELEVENLABS_API_KEY`). vk never prints it.
+2. **Check your characters:** `vk eleven credits`. Each line costs about one character per
+   letter of the text sent, vowel marks included, for every take.
+3. **One voice per speaker.** `vk eleven voices` clones each speaker's `clip` once (Instant Voice
+   Cloning, Starter plan and up) and keeps the ids in `build/eleven/voices.json`. To use voices you
+   made on the website instead (for example with Voice Design), list them with
+   `vk eleven voices --list` and set them in `voices.yaml`:
+
+   ```yaml
+   eleven:
+     voices: {narrator: 21m00Tcm4TlvDq8ikWAM}
+   ```
+
+4. **Record.** New lines, every speaker, `eleven.takes` takes each:
+
+   ```bash
+   vk eleven record 12-15
+   ```
+
+   or spellings to try, from the same YAML file as `vk fix`:
+
+   ```bash
+   vk eleven record --fixes fixes.yaml --speakers guide
+   ```
+
+   It shows how many characters it will use and asks before spending them (`--yes` skips the
+   question). Every clip is kept in `build/eleven/clips/`, so running the same command again costs
+   nothing. The output is `build/out/eleven/eleven.zip`, in the same form as a fix notebook's
+   `fix.zip`. Plain recordings are named `<speaker>_<line>_e<take>`.
+5. **Pick and swap,** as in step 6: the clips in use now sit next to the ElevenLabs takes.
+
+   ```bash
+   vk listen build/out/eleven/eleven.zip --compare build/out/check/voices_checked.zip
+   ```
+
+   For new lines, compare with the `new-lines` notebook's `voices_checked.zip`, swap your picks into
+   it with `use-take`, then `merge` as usual.
+
+Settings (all optional):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `eleven.model` | `eleven_v3` | The ElevenLabs model. |
+| `eleven.language` | `ar` | The language code sent with each line (`""` sends none). |
+| `eleven.takes` | 2 | Takes per line. |
+| `eleven.stability` | 0.5 | 0..1. `eleven_v3` takes only 0 (creative), 0.5 (natural) or 1 (robust). |
+| `eleven.similarity` / `style` / `speed` | 0.75 / 0 / 1.0 | Closeness to the clip, extra style, speed (0.7..1.2). |
+| `eleven.vowels` | true | Send the pronunciation file's vowel marks (false: the plain sentence). |
+| `eleven.at_once` | 2 | Requests in parallel (your plan's concurrency limit). |
+| `eleven.key_file` | `~/.config/elevenlabs/api_key` | Where the API key is read from. |
+| `eleven.voices` | `{}` | Speaker id → voice id made on elevenlabs.io (skips cloning). |
+
+Selling what you record needs a paid ElevenLabs plan (the free plan is non-commercial), and you
+need the right to clone each voice.
 
 ## Kaggle limits
 

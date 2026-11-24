@@ -17,7 +17,24 @@ STYLE = """body{font-family:system-ui,sans-serif;margin:24px;background:#f6f8fa;
 table{border-collapse:collapse;background:#fff}td,th{padding:10px 12px;border-bottom:1px solid #e3e6ea;
 text-align:left;vertical-align:top}.t{font-size:19px}.h{font-size:15px;color:#a0522d;margin-top:4px}
 .n{color:#666;font-size:13px}.f{color:#b42318;font-size:13px;font-weight:600}.p{display:flex;align-items:center;gap:6px;margin:4px 0}.p b{width:26px}
-audio{width:220px}"""
+audio{width:220px}label.u{font-size:13px;color:#555;cursor:pointer}
+#picks{position:sticky;bottom:0;background:#fff;border-top:2px solid #d0d7de;padding:12px;margin-top:16px}
+#picks textarea{width:100%;height:58px;font-family:monospace;font-size:13px}"""
+
+# The pick buttons: one choice per row, kept in the browser, turned into the use-take command.
+PICKS_JS = """<script>
+const KEY='vk-picks:'+location.pathname, cmd=document.getElementById('cmd');
+let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+function update(){const picks=[...document.querySelectorAll('input.pick:checked')].map(i=>i.value).filter(v=>v);
+ const s={};document.querySelectorAll('input.pick:checked').forEach(i=>s[i.name]=i.value);
+ try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}
+ document.getElementById('count').textContent=picks.length;
+ cmd.value=picks.length?cmd.dataset.prefix+' '+picks.join(' '):'(pick a take in a row to swap it in)';}
+document.querySelectorAll('input.pick').forEach(i=>{if(saved[i.name]!==undefined)i.checked=saved[i.name]===i.value;
+ i.addEventListener('change',update)});
+document.getElementById('copy').onclick=()=>{cmd.select();try{navigator.clipboard.writeText(cmd.value)}catch(e){document.execCommand('copy')}};
+update();
+</script>"""
 
 
 def build(cfg, zip_path, out_dir, compare=None, show_all=False):
@@ -99,17 +116,28 @@ def _fix_page(zip_path, out_dir, base):
         clips[(job["speaker"], job["line"])][job["variant"]].append(name)
     rows = []
     for (speaker, line), variants in sorted(clips.items()):
+        row = f"{speaker}_{line:03d}"
+        keep = (f"<label class=u><input type=radio class=pick name='{html.escape(row)}' value='' checked> "
+                "keep</label>")
         now = _copy(base, f"voices/{speaker}/{line:03d}.flac", out_dir, f"{speaker}_{line:03d}_now.flac") \
             if base else ""
         cells = []
         for variant, takes in sorted(variants.items()):
             players = "".join(
                 f"<div class=p><b>{html.escape(variant)}{said[t]['take']}</b>"
-                f"{_copy(zip_path, f'fix/{t}.flac', out_dir, f'{t}.flac')}</div>" for t in takes)
+                f"{_copy(zip_path, f'fix/{t}.flac', out_dir, f'{t}.flac')}"
+                f"<label class=u><input type=radio class=pick name='{html.escape(row)}' "
+                f"value='{html.escape(t)}'> use</label></div>" for t in takes)
             cells.append(f"<td><div dir=rtl class=t>{html.escape(said[takes[0]]['text'])}</div>{players}</td>")
-        rows.append(f"<tr><td>{html.escape(speaker)}<div class=n>line {line}</div></td>"
+        rows.append(f"<tr><td>{html.escape(speaker)}<div class=n>line {line}</div>{keep}</td>"
                     + (f"<td>{now}</td>" if base else "") + "".join(cells) + "</tr>")
+    base_zip = base or "<voices zip>"
+    out_zip = (os.path.splitext(base)[0] + "_picked.zip") if base else "<new voices zip>"
+    prefix = f"vk use-take {zip_path} {base_zip} {out_zip}"
     return ("<h2>Pick the best take</h2><p>Each column is one spelling, given to the voice exactly as "
-            "shown. Note the take you like (for example <b>narrator_003_b2</b>: speaker, line, spelling, "
-            "take) and swap it in with <code>vk use-take</code>.</p><table>"
-            + "".join(rows) + "</table>")
+            "shown. Press <b>use</b> on the take you like in each row (<b>keep</b> leaves the clip in use "
+            "now); your picks are remembered in this browser. Then run the command below.</p><table>"
+            + "".join(rows) + "</table>"
+            f"<div id=picks><b><span id=count>0</span> picked.</b> Swap them in with:"
+            f"<textarea id=cmd readonly data-prefix='{html.escape(prefix)}'></textarea>"
+            "<button id=copy>Copy</button></div>" + PICKS_JS)
